@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PromoUp TV - Premium Digital Signage</title>
+  
+  <!-- Modern Fonts for Food Vibes -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    /* Reset & Base Setup */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    :root {
+      --bg-dark: #0A0A0A;
+      --bg-gradient: radial-gradient(circle at 50% 50%, #2b0808 0%, #0A0A0A 80%);
+      --text-main: #FFFFFF;
+      --accent-color: #FFB800;
+      --price-color: #00E676;
+      --card-bg: rgba(255, 255, 255, 0.05);
+      --card-border: rgba(255, 255, 255, 0.1);
+    }
+
+    body { 
+      font-family: 'Montserrat', sans-serif;
+      background: var(--bg-dark);
+      background-image: var(--bg-gradient);
+      color: var(--text-main);
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      padding: 30px 60px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, transparent 100%);
+      z-index: 10;
+    }
+    
+    .tv-title {
+      font-family: 'Oswald', sans-serif;
+      font-size: 56px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      text-shadow: 2px 4px 10px rgba(0,0,0,0.5);
+      color: #FFB800;
+    }
+
+    .main-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      width: 100%;
+    }
+
+    .slider-track {
+      display: flex;
+      height: 100%;
+      width: 100%;
+      transition: transform 1.2s cubic-bezier(0.86, 0, 0.07, 1);
+    }
+
+    .slide-page {
+      min-width: 100vw;
+      height: 100%;
+      padding: 0 60px 40px 60px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(2, 1fr);
+      gap: 40px;
+      align-items: center;
+    }
+
+    .product-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      padding: 20px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+      backdrop-filter: blur(10px);
+      transition: transform 0.5s ease;
+    }
+
+    @keyframes floating {
+      0% { transform: translateY(0px); }
+      50% { transform: translateY(-8px); }
+      100% { transform: translateY(0px); }
+    }
+    .product-card:nth-child(odd) { animation: floating 6s ease-in-out infinite; }
+    .product-card:nth-child(even) { animation: floating 6s ease-in-out infinite 3s; }
+
+    .image-container {
+      height: 55%;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      margin-bottom: 20px;
+    }
+
+    .image-container img {
+      max-height: 120%;
+      max-width: 110%;
+      object-fit: contain;
+      filter: drop-shadow(0px 15px 15px rgba(0,0,0,0.6));
+      transition: transform 0.5s ease;
+      z-index: 2;
+    }
+
+    .product-details {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      text-align: center;
+      z-index: 3;
+    }
+
+    .product-name {
+      font-family: 'Oswald', sans-serif;
+      font-size: 42px;
+      line-height: 1.1;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: white;
+      text-shadow: 0px 4px 6px rgba(0,0,0,0.8);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .tag-promocao {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: #E53935;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 30px;
+      font-size: 16px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      box-shadow: 0 4px 10px rgba(229, 57, 53, 0.4);
+      z-index: 4;
+    }
+
+    .price-container {
+      display: inline-block;
+      align-self: center;
+      background: var(--accent-color);
+      color: #111;
+      padding: 10px 30px;
+      border-radius: 50px;
+      margin-top: auto;
+      transform: translateY(15px);
+      box-shadow: 0 10px 20px rgba(255, 184, 0, 0.4);
+    }
+    
+    .price-text {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 46px;
+      font-weight: 900;
+      letter-spacing: -1px;
+    }
+
+    .currency {
+      font-size: 24px;
+      vertical-align: super;
+      font-weight: 700;
+    }
+
+    .loader-container {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-dark);
+      z-index: 100;
+    }
+    .loader {
+      width: 50px;
+      height: 50px;
+      border: 5px solid rgba(255,255,255,0.1);
+      border-top-color: var(--accent-color);
+      border-radius: 50%;
+      animation: spin 1s infinite linear;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .progress-bar-container {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 6px;
+      background: rgba(255,255,255,0.1);
+      z-index: 10;
+    }
+    .progress-bar {
+      height: 100%;
+      background: var(--accent-color);
+      width: 0%;
+      transition: width 0.1s linear;
+    }
+    
+    @media (max-aspect-ratio: 4/3) {
+      .slide-page { 
+        grid-template-columns: repeat(2, 1fr); 
+        grid-template-rows: repeat(3, 1fr); 
+      }
+    }
+  </style>
+  <script src="config.js"></script>
+</head>
+<body>
+
+  <div class="header">
+    <div class="tv-title" id="tv-name">Menu Digital</div>
+    <div style="font-size: 32px; font-weight: bold; color: #fff; font-family: 'Montserrat'; opacity: 0.8" id="clock">00:00</div>
+  </div>
+
+  <div class="main-container">
+    <div class="loader-container" id="loader">
+      <div class="loader"></div>
+    </div>
+    <div class="slider-track" id="slider-track">
+      <!-- Slides will be injected here -->
+    </div>
+  </div>
+
+  <div class="progress-bar-container">
+    <div class="progress-bar" id="progress-bar"></div>
+  </div>
+
+  <script>
+    // FUNÇÃO DE ESCAPE DE HTML (CORRIGIDA - AGORA NO SCRIPT)
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    const API_URL = window.APP_CONFIG.API_URL;
+    let currentSlide = 0;
+    let totalSlides = 0;
+    let slideIntervalDelay = 10000;
+    let timerID = null;
+    let progressTimerID = null;
+
+    // Clock update
+    setInterval(() => {
+      const now = new Date();
+      document.getElementById('clock').innerText = now.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+    }, 1000);
+
+    function formatPrice(value) {
+      if(value === undefined || value === null) return "0,00";
+      return parseFloat(value).toFixed(2).replace('.', ',');
+    }
+
+    async function loadData() {
+      const params = new URLSearchParams(window.location.search);
+      const tvRoute = params.get('tv');
+      
+      try {
+        let tvName = "Menu Promocional";
+        let bgColor = null;
+        
+        if (tvRoute) {
+          const tvResponse = await fetch(`${API_URL}/tvs/route/${tvRoute}`);
+          if (tvResponse.ok) {
+             const tv = await tvResponse.json();
+             tvName = tv.nome || tvName;
+             if(tv.layout && tv.layout.cor_fundo) {
+               bgColor = tv.layout.cor_fundo;
+               document.body.style.backgroundImage = 'none';
+               document.body.style.backgroundColor = bgColor;
+             }
+          }
+        }
+        
+        document.getElementById('tv-name').innerText = tvName;
+
+        const [prodResponse, promoResponse] = await Promise.all([
+          fetch(`${API_URL}/produtos-selecionados`).catch(() => null),
+          fetch(`${API_URL}/promocoes`).catch(() => null)
+        ]);
+
+        let items = [];
+        
+        if (prodResponse && prodResponse.ok) {
+          const prods = await prodResponse.json();
+          prods.forEach(p => {
+            items.push({
+              id: p.id,
+              nome: p.nome,
+              preco: p.preco,
+              foto: p.foto,
+              isPromo: false
+            });
+          });
+        }
+        
+        if (promoResponse && promoResponse.ok) {
+          const promos = await promoResponse.json();
+          promos.forEach(p => {
+            if(p.status === 'A') {
+               items.push({
+                 id: p.PRD_ID || p.id,
+                 nome: p.descricao,
+                 preco: p.preco || 0,
+                 foto: p.foto || p.PRD_FOTO ? 'TEM_FOTO' : null,
+                 isPromo: true
+               });
+            }
+          });
+        }
+
+        buildSlider(items);
+        
+      } catch (err) {
+        console.error("Erro ao carregar os dados:", err);
+        document.getElementById('slider-track').innerHTML = `<h1 style="margin: auto;">Erro de Conexão. Tentando novamente...</h1>`;
+        setTimeout(loadData, 5000);
+      } finally {
+        document.getElementById('loader').style.display = 'none';
+      }
+    }
+
+    function buildSlider(items) {
+      const track = document.getElementById('slider-track');
+      track.innerHTML = '';
+      
+      if (items.length === 0) {
+        track.innerHTML = `<h1 style="margin: auto; color:#fff; text-align:center;">Cardápio Indisponível no momento.</h1>`;
+        return;
+      }
+
+      const itemsPerPage = 6;
+      totalSlides = Math.ceil(items.length / itemsPerPage);
+      
+      for(let i=0; i<totalSlides; i++) {
+        const slideItems = items.slice(i * itemsPerPage, (i+1) * itemsPerPage);
+        
+        const pageDiv = document.createElement('div');
+        pageDiv.className = 'slide-page';
+        
+        slideItems.forEach(item => {
+          let imgPath = 'img/sample_product.png';
+          if (item.foto === 'TEM_FOTO' && item.id) {
+             imgPath = `${API_URL}/produtos/${item.id}/foto`;
+          }
+          const promoTag = item.isPromo ? `<div class="tag-promocao">Promoção</div>` : '';
+          const priceValue = item.preco > 0 ? formatPrice(item.preco) : '--,--';
+          
+          // Usando escapeHtml para evitar problemas com acentos
+          const nomeEscapado = escapeHtml(item.nome);
+          
+          const cardHtml = `
+            <div class="product-card">
+              ${promoTag}
+              <div class="image-container">
+                <img src="${imgPath}" alt="${nomeEscapado}" onerror="this.src=''; this.style.display='none';">
+              </div>
+              <div class="product-details">
+                <div class="product-name">${nomeEscapado}</div>
+                <div class="price-container">
+                  <span class="currency">R$</span><span class="price-text">${priceValue}</span>
+                </div>
+              </div>
+            </div>
+          `;
+          pageDiv.innerHTML += cardHtml;
+        });
+        
+        track.appendChild(pageDiv);
+      }
+
+      currentSlide = 0;
+      if (totalSlides > 1) {
+        startCarousel();
+      }
+    }
+
+    function startCarousel() {
+      if(timerID) clearInterval(timerID);
+      if(progressTimerID) clearInterval(progressTimerID);
+      
+      let startTime = Date.now();
+      const progressBar = document.getElementById('progress-bar');
+      
+      progressTimerID = setInterval(() => {
+        let elapsed = Date.now() - startTime;
+        let percentage = (elapsed / slideIntervalDelay) * 100;
+        if(percentage > 100) percentage = 100;
+        progressBar.style.width = percentage + '%';
+      }, 50);
+
+      timerID = setInterval(() => {
+        currentSlide++;
+        if (currentSlide >= totalSlides) {
+          currentSlide = 0;
+        }
+        
+        const track = document.getElementById('slider-track');
+        track.style.transform = `translateX(-${currentSlide * 100}vw)`;
+        
+        startTime = Date.now();
+      }, slideIntervalDelay);
+    }
+
+    const evtSource = new EventSource(API_URL + '/events');
+    evtSource.onmessage = function(event) {
+      if (event.data) {
+        console.log("Servidor avisou para atualizar:", event.data);
+        const data = JSON.parse(event.data);
+        if (data.action === 'produtos-atualizados' || data.action === 'tv-updated') {
+            document.getElementById('loader').style.display = 'flex';
+            loadData();
+        }
+      }
+    };
+
+    window.addEventListener('DOMContentLoaded', loadData);
+  </script>
+</body>
+</html>

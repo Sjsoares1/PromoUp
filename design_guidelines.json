@@ -1,0 +1,141 @@
+{
+  "identity": {
+    "name": "PromoUp - The Modern Prism",
+    "core_concept": "Crystal clear management for vibrant displays. The interface is the invisible glass; the promotion is the light.",
+    "emotional_tone": "Professional, Efficient, Crisp, Trustworthy.",
+    "theme_mode": "light",
+    "design_archetype": "Swiss & High-Contrast (Modernized)"
+  },
+  "colors": {
+    "palette": {
+      "primary": {
+        "main": "#0F172A",
+        "description": "Deep Slate for Sidebar and Primary Navigation. Grounds the light interface.",
+        "tailwind": "bg-slate-900 text-white"
+      },
+      "accent": {
+        "main": "#2563EB",
+        "hover": "#1D4ED8",
+        "description": "Interstellar Blue. Used for Primary Actions (Save, Add, Connect). High trust.",
+        "tailwind": "bg-blue-600 hover:bg-blue-700 text-white"
+      },
+      "background": {
+        "main": "#F8FAFC",
+        "card": "#FFFFFF",
+        "description": "Slate 50 for app background to reduce eye strain compared to pure white. Pure white for cards.",
+        "tailwind": "bg-slate-50"
+      },
+      "status": {
+        "success": "#10B981",
+        "error": "#EF4444",
+        "warning": "#F59E0B",
+        "description": "Standardized functional colors for connectivity status (TV Online/Offline)."
+      },
+      "text": {
+        "primary": "#0F172A",
+        "secondary": "#64748B",
+        "description": "High contrast Slate 900 for headings, Slate 500 for body/labels."
+      }
+    },
+    "gradients": {
+      "dashboard_header": "bg-gradient-to-r from-slate-900 to-slate-800",
+      "active_tv_card": "bg-gradient-to-br from-white to-slate-50"
+    }
+  },
+  "typography": {
+    "headings": {
+      "font_family": "Plus Jakarta Sans, sans-serif",
+      "weights": "600, 700",
+      "usage": "Page Titles, Card Headers, Modal Titles. Banned: Inter for headings.",
+      "tailwind_classes": "font-sans font-bold tracking-tight"
+    },
+    "body": {
+      "font_family": "Inter, sans-serif",
+      "weights": "400, 500",
+      "usage": "General text, inputs, form labels.",
+      "tailwind_classes": "font-sans text-slate-600"
+    },
+    "mono": {
+      "font_family": "JetBrains Mono, monospace",
+      "usage": "IP Addresses, Ports, Database Paths, System IDs.",
+      "tailwind_classes": "font-mono text-sm"
+    }
+  },
+  "layout_strategy": {
+    "dashboard": {
+      "structure": "Sidebar Navigation (Fixed Left) + Header (Status) + Main Content Area (Scrollable).",
+      "grid": "Bento Grid approach for status widgets. 4 columns on large screens.",
+      "spacing": "Relaxed. p-8 for main content area. gap-6 for grid items."
+    },
+    "wizard": {
+      "structure": "Step Progress Indicator (Top or Left) + Form Content (Center) + Action Bar (Bottom Fixed).",
+      "style": "Clean, numbered steps. Current step highlighted in Blue."
+    },
+    "timeline": {
+      "structure": "Horizontal or Vertical drag-and-drop zones.",
+      "visual": "Film-strip aesthetic. Each item is a 'Frame' with time duration clearly visible."
+    },
+    "tv_display": {
+      "structure": "Fullscreen, 100vh/100vw. No padding. Absolute positioning for overlays.",
+      "mode": "High Impact. Maximized imagery."
+    }
+  },
+  "components": {
+    "cards": {
+      "style": "Flat white background, 1px border-slate-200. No shadow by default. Hover: shadow-md + scale-[1.01] transition.",
+      "radius": "rounded-xl"
+    },
+    "buttons": {
+      "primary": "bg-blue-600 text-white hover:bg-blue-700 shadow-sm rounded-md px-4 py-2 font-medium transition-all",
+      "secondary": "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 rounded-md px-4 py-2 font-medium",
+      "destructive": "bg-white text-red-600 border border-red-200 hover:bg-red-50 rounded-md"
+    },
+    "inputs": {
+      "style": "bg-white border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-md h-10 px-3",
+      "label": "text-sm font-medium text-slate-700 mb-1.5 block"
+    },
+    "status_badge": {
+      "online": "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800",
+      "offline": "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800"
+    }
+  },
+  "images": {
+    "placeholders": [
+      {
+        "category": "fashion_retail",
+        "url": "https://images.unsplash.com/photo-1752940473518-23e143d69a4c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjh8MHwxfHNlYXJjaHwxfHxmYXNoaW9uJTIwc3RvcmUlMjBzdW1tZXIlMjBzYWxlJTIwbW9kZWwlMjBwcm9mZXNzaW9uYWx8ZW58MHx8fHwxNzcyMjI5ODUxfDA&ixlib=rb-4.1.0&q=85",
+        "description": "Woman in fashion store, good for 'Clothing Category' demo."
+      },
+      {
+        "category": "food_promo",
+        "url": "https://images.unsplash.com/photo-1625813506062-0aeb1d7a094b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTZ8MHwxfHNlYXJjaHwyfHxnb3VybWV0JTIwYnVyZ2VyJTIwZmFzdCUyMGZvb2QlMjBwcm9tb3Rpb24lMjBwcm9mZXNzaW9uYWwlMjBwaG90b3xlbnwwfHx8fDE3NzIyMjk4NTF8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Gourmet burgers, ideal for 'Food Promo' example."
+      },
+      {
+        "category": "electronics_tv",
+        "url": "https://images.unsplash.com/photo-1701318134576-6100f43c8531?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODl8MHwxfHNlYXJjaHwyfHxjb25zdW1lciUyMGVsZWN0cm9uaWNzJTIwNGslMjB0diUyMGRpc3BsYXklMjBzaG93cm9vbXxlbnwwfHx8fDE3NzIyMjk4NTJ8MA&ixlib=rb-4.1.0&q=85",
+        "description": "TV screen close up, good for 'Device Management' thumbnail."
+      },
+      {
+        "category": "store_interior",
+        "url": "https://images.unsplash.com/photo-1743020189969-ccab36da6319?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MDV8MHwxfHNlYXJjaHw0fHxtb2Rlcm4lMjByZXRhaWwlMjBzdG9yZSUyMGludGVyaW9yJTIwd2l0aCUyMGRpZ2l0YWwlMjBzaWduYWdlfGVufDB8fHx8MTc3MjIyOTg1MHww&ixlib=rb-4.1.0&q=85",
+        "description": "Storefront sign, good for 'Establishment' generic image."
+      }
+    ]
+  },
+  "instructions_to_main_agent": {
+    "file_extension": "CRITICAL: Use .js extension for all React files. Do not use .tsx or .ts. The project is JavaScript based.",
+    "testing": "CRITICAL: Add data-testid to every interactive element (buttons, inputs, cards). Format: 'page-section-element-action'. Example: 'dashboard-sidebar-tv-link'.",
+    "icons": "Use 'lucide-react' for all icons (Activity, Tv, Settings, Calendar, Play, Pause, Trash).",
+    "mock_data": "Create a robust 'mockService.js' to simulate Firebird data (Products, Categories) since real DB is not available yet.",
+    "routing": "Use 'react-router-dom'. Define specific routes for public displays: '/display/:tvId'.",
+    "layout_components": "Create a 'DashboardLayout' component that wraps the Sidebar and Header to ensure consistency across admin pages."
+  },
+  "universal_guidelines": [
+    "Don't make generic centered layouts. Use grid-cols-12 for complex data.",
+    "Use 2-3x more spacing than typical. p-4 is minimum for containers, p-8 is standard.",
+    "Every interaction needs micro-animations (hover states).",
+    "Never use full transparent backgrounds on headers with content behind them.",
+    "Always provide visual feedback for actions (Toasts for 'Saved', 'Connected', 'Error')."
+  ]
+}

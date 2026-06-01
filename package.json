@@ -1,0 +1,24 @@
+{
+  "name": "promoup-desktop",
+  "version": "1.0.0",
+  "description": "PromoUp - Sistema de Gestão de Promoções para TVs",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev"
+  },
+  "keywords": [
+    "electron",
+    "promoup",
+    "digital-signage"
+  ],
+  "author": "PromoUp",
+  "license": "MIT",
+  "dependencies": {
+    "node-firebird": "^2.0.2",
+    "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "electron": "^40.8.0"
+  }
+}
