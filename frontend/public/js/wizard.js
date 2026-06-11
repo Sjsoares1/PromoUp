@@ -68,7 +68,32 @@ async function saveTV(event) {
   }
 }
 
+async function updateRoutePrefix() {
+  try {
+    const statusRes = await fetch(`${API_URL}/status`);
+    if (statusRes.ok) {
+      const statusData = await statusRes.json();
+      if (statusData && statusData.local_ip) {
+        let prefix;
+        if (statusData.short_port) {
+          const port = statusData.short_port;
+          prefix = `http://${statusData.local_ip}${port === 80 ? '' : ':' + port}/`;
+        } else {
+          prefix = `http://${statusData.local_ip}:9090/`;
+        }
+        const prefixEl = document.getElementById('route_prefix');
+        if (prefixEl) {
+          prefixEl.textContent = prefix;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Não foi possível obter o IP local para o prefixo da rota:', e);
+  }
+}
+
 window.addEventListener('DOMContentLoaded', () => {
+  updateRoutePrefix();
   checkEditMode();
   document.getElementById('tvForm').addEventListener('submit', saveTV);
 });

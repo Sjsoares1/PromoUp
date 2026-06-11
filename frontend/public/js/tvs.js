@@ -1,9 +1,27 @@
 const API_URL = window.APP_CONFIG.API_URL;
 
 let tvs = [];
+let routePrefix = 'http://localhost:9090/display.html?tv='; // Fallback padrão
 
 async function loadTVs() {
   try {
+    try {
+      const statusRes = await fetch(`${API_URL}/status`);
+      if (statusRes.ok) {
+        const statusData = await statusRes.json();
+        if (statusData && statusData.local_ip) {
+          if (statusData.short_port) {
+            const port = statusData.short_port;
+            routePrefix = `http://${statusData.local_ip}${port === 80 ? '' : ':' + port}/`;
+          } else {
+            routePrefix = `http://${statusData.local_ip}:9090/`;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Não foi possível obter status do IP local, usando fallback.', e);
+    }
+
     const response = await fetch(`${API_URL}/tvs`);
     tvs = await response.json();
     
@@ -62,7 +80,7 @@ function renderTVs() {
       
       <div>
         <p style="font-size: 12px; color: #64748B; margin-bottom: 4px;">Endereço de Acesso:</p>
-        <div class="tv-url">http://localhost:9090/display.html?tv=${tv.route_path}</div>
+        <div class="tv-url">${routePrefix === 'http://localhost:9090/display.html?tv=' ? `http://localhost:9090/display.html?tv=${tv.route_path}` : `${routePrefix}${tv.route_path}`}</div>
       </div>
       
       <div class="tv-actions">
@@ -112,7 +130,8 @@ function configurePromo(id) {
 }
 
 function openDisplay(route) {
-  window.open(`display.html?tv=${route}`, '_blank', 'fullscreen=yes');
+  const url = routePrefix === 'http://localhost:9090/display.html?tv=' ? `display.html?tv=${route}` : `${routePrefix}${route}`;
+  window.open(url, '_blank', 'fullscreen=yes');
 }
 
 async function deleteTV(id, nome) {

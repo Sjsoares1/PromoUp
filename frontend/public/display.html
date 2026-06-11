@@ -277,7 +277,15 @@
 
     async function loadData() {
       const params = new URLSearchParams(window.location.search);
-      const tvRoute = params.get('tv');
+      let tvRoute = params.get('tv');
+      if (!tvRoute) {
+        const cleanPath = window.location.pathname.replace(/^\/+|\/+$/g, '');
+        const pathParts = cleanPath.split('/');
+        const lastPart = pathParts[pathParts.length - 1];
+        if (lastPart && lastPart !== 'display.html') {
+          tvRoute = decodeURIComponent(lastPart);
+        }
+      }
       
       try {
         let tvName = "Menu Promocional";

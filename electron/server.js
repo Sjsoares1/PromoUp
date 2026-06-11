@@ -5,6 +5,8 @@ const fbModule = require('./firebird');
 const { initDatabase, getDb } = require('./database');
 
 let server;
+let serverShort;
+let shortPort = null;
 let sseClients = [];
 
 const MIME_TYPES = {
@@ -103,12 +105,28 @@ function handleAPI(req, res, url, method) {
           }
           db.get('SELECT COUNT(*) as count FROM produtos_selecionados', (err, rowPromos) => {
             db.get('SELECT COUNT(DISTINCT tv_id) as count FROM tv_configuracoes WHERE ativa = 1', (err, rowAtivas) => {
+              const os = require('os');
+              const interfaces = os.networkInterfaces();
+              let localIp = 'localhost';
+              for (const interfaceName in interfaces) {
+                const addresses = interfaces[interfaceName];
+                for (const addr of addresses) {
+                  if (addr.family === 'IPv4' && !addr.internal) {
+                    localIp = addr.address;
+                    break;
+                  }
+                }
+                if (localIp !== 'localhost') break;
+              }
+
               res.writeHead(200);
               res.end(safeStringify({
                 tvs_ativas: rowTvs ? rowTvs.count : 0,
                 total_promocoes: rowPromos ? rowPromos.count : 0,
                 ativas_agora: rowAtivas ? rowAtivas.count : 0,
-                servidor_online: true
+                servidor_online: true,
+                local_ip: localIp,
+                short_port: shortPort
               }));
             });
           });
@@ -438,42 +456,104 @@ function handleAPI(req, res, url, method) {
   });
 }
 
+function requestHandler(req, res) {
+  const url = req.url.split('?')[0];
+  const method = req.method;
+
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (method === 'OPTIONS') {
+    res.writeHead(200);
+    res.end();
+    return;
+  }
+
+  if (url.startsWith('/api/')) {
+    handleAPI(req, res, url, method);
+    return;
+  }
+
+  let filePath = path.join(__dirname, '../frontend/public', url === '/' ? 'index.html' : url);
+
+  fs.access(filePath, fs.constants.F_OK, (err) => {
+    if (err) {
+      // O arquivo não existe. Vamos verificar se é uma rota de TV.
+      const possibleRoute = decodeURIComponent(url.substring(1)); // remove a barra inicial
+      const db = getDb();
+      if (db && possibleRoute) {
+        db.get('SELECT id FROM tvs WHERE route_path = ?', [possibleRoute], (dbErr, row) => {
+          if (!dbErr && row) {
+            const displayFilePath = path.join(__dirname, '../frontend/public/display.html');
+            serveStatic(res, displayFilePath);
+            return;
+          }
+          res.writeHead(404);
+          res.end('Not Found');
+        });
+        return;
+      }
+    }
+    serveStatic(res, filePath);
+  });
+}
+
 async function startServer(port) {
   await initDatabase();
 
-  server = http.createServer((req, res) => {
-    const url = req.url.split('?')[0];
-    const method = req.method;
+  server = http.createServer(requestHandler);
 
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-    if (method === 'OPTIONS') {
-      res.writeHead(200);
-      res.end();
-      return;
-    }
-
-    if (url.startsWith('/api/')) {
-      handleAPI(req, res, url, method);
-      return;
-    }
-
-    let filePath = path.join(__dirname, '../frontend/public', url === '/' ? 'index.html' : url);
-    serveStatic(res, filePath);
-  });
-
-  return new Promise((resolve, reject) => {
+  const primaryPromise = new Promise((resolve, reject) => {
     server.listen(port, (err) => {
       if (err) reject(err);
       else resolve();
     });
   });
+
+  // Tenta iniciar o servidor secundário na porta 80. Caso falhe, tenta a porta 81.
+  serverShort = http.createServer(requestHandler);
+  
+  serverShort.once('error', (err) => {
+    console.log(`ℹ Não foi possível iniciar o servidor secundário na porta 80: ${err.message}`);
+    // Se a porta 80 falhou, tenta a porta 81
+    try {
+      serverShort = http.createServer(requestHandler);
+      serverShort.listen(81, () => {
+        shortPort = 81;
+        console.log(`✓ Servidor secundário iniciado na porta 81 (acesso curto alternativo)`);
+      });
+      serverShort.on('error', (err81) => {
+        console.log(`ℹ Servidor secundário na porta 81 também não foi iniciado: ${err81.message}`);
+        shortPort = null;
+        serverShort = null;
+      });
+    } catch (e) {
+      console.log(`ℹ Erro ao tentar abrir porta 81: ${e.message}`);
+      shortPort = null;
+      serverShort = null;
+    }
+  });
+
+  try {
+    serverShort.listen(80, () => {
+      shortPort = 80;
+      console.log(`✓ Servidor secundário iniciado na porta 80 (acesso curto)`);
+    });
+  } catch (err) {
+    console.log(`ℹ Erro ao tentar abrir porta 80: ${err.message}`);
+  }
+
+  return primaryPromise;
 }
 
 function stopServer() {
   if (server) server.close();
+  if (serverShort) {
+    try {
+      serverShort.close();
+    } catch (e) {}
+  }
   sseClients.forEach(c => c.res.end());
 }
 
