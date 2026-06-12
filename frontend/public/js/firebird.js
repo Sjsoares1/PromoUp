@@ -80,15 +80,21 @@ async function testConnection() {
     port: parseInt(porta),
     database: caminhoBanco,
     user: user,
-    password: password
+    password: password,
+    dll_path: dllPath
   };
   
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 7000);
+
   try {
     const response = await fetch(`${API_URL}/firebird-test`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(requestBody),
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
     
     const result = await response.json();
     
@@ -98,7 +104,12 @@ async function testConnection() {
       showFeedback(`✗ Erro na conexão: ${result.message}`, 'error');
     }
   } catch (error) {
-    showFeedback(`✗ Erro ao testar conexão: ${error.message}`, 'error');
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      showFeedback('✗ Erro ao testar conexão: Tempo limite esgotado.', 'error');
+    } else {
+      showFeedback(`✗ Erro ao testar conexão: ${error.message}`, 'error');
+    }
   } finally {
     // Restore button state
     btnTest.disabled = false;

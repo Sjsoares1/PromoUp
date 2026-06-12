@@ -6,13 +6,13 @@ let todosProdutos = [];
 async function carregarProdutos() {
   const btnSync = document.getElementById('btn-sync');
   const tbody = document.getElementById('tabela-produtos');
-  
+
   if (btnSync) {
     btnSync.disabled = true;
     btnSync.innerHTML = 'Buscando Produtos...';
   }
-  
-  tbody.innerHTML = `<tr><td colspan="5" style="padding: 20px; text-align: center;">Carregando produtos direto do Firebird...</td></tr>`;
+
+  tbody.innerHTML = `<tr><td colspan="5" style="padding: 20px; text-align: center;">Carregando produtos...</td></tr>`;
 
   try {
     const resLocais = await fetch(`${API_URL}/produtos-selecionados`);
@@ -20,7 +20,7 @@ async function carregarProdutos() {
     const idsSalvos = new Set(produtosSalvos.map(p => String(p.id)));
 
     const resJson = await fetch(`${API_URL}/produtos`);
-    if(!resJson.ok) throw new Error("Erro ao consultar ERP");
+    if (!resJson.ok) throw new Error("Erro ao consultar ERP");
     const produtosJson = await resJson.json();
 
     const mapaProdutos = new Map();
@@ -54,18 +54,18 @@ async function carregarProdutos() {
       const descricao = produto.prd_descricao || produto.PRD_DESCRICAO;
       const preco = produto.prd_preco_venda || produto.PRD_PRECO_VENDA || 0;
       const foto = produto.prd_foto || produto.PRD_FOTO;
-      
+
       const estaMarcado = idsSalvos.has(String(id)) ? 'checked' : '';
       const precoFormatado = Number(preco).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-      
+
       let htmlFoto = `<div style="width: 40px; height: 40px; background: #e2e8f0; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #64748B;">Sem Foto</div>`;
       if (foto === 'TEM_FOTO' || (typeof foto === 'string' && foto.includes('TEM_FOTO'))) {
-         htmlFoto = `<div style="width: 40px; height: 40px; background: #10b981; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #fff;">📸</div>`;
+        htmlFoto = `<div style="width: 40px; height: 40px; background: #10b981; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #fff;">📸</div>`;
       }
-      
+
       const tr = document.createElement('tr');
       tr.style.borderBottom = '1px solid #f1f5f9';
-      
+
       tr.innerHTML = `
         <td style="padding: 12px 16px;">
           <input type="checkbox" class="check-produto" value="${id}" ${estaMarcado} style="cursor: pointer;">
@@ -83,9 +83,9 @@ async function carregarProdutos() {
     alert('ERRO: ' + error.message);
     tbody.innerHTML = `<tr><td colspan="5" style="padding: 20px; text-align: center; color: red;">Faça a configuração do Firebird!</td></tr>`;
   } finally {
-    if(btnSync) {
-       btnSync.disabled = false;
-       btnSync.innerHTML = '<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> RECARREGAR ERP';
+    if (btnSync) {
+      btnSync.disabled = false;
+      btnSync.innerHTML = '<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> RECARREGAR ERP';
     }
   }
 }
@@ -141,10 +141,10 @@ async function salvarSelecao() {
     });
 
     if (response.ok) {
-        // Disparos WebSocket (SSE) ocorrem silenciosamente no backend que vao atualizar a TV na mesma hora.
-       alert(`Sucesso! ${selecionados.length} produtos foram gravados na Vitrine.`);
+      // Disparos WebSocket (SSE) ocorrem silenciosamente no backend que vao atualizar a TV na mesma hora.
+      alert(`Sucesso! ${selecionados.length} produtos foram gravados na Vitrine.`);
     } else {
-       alert('Erro ao salvar no banco de dados local.');
+      alert('Erro ao salvar no banco de dados local.');
     }
   } catch (error) {
     console.error(error);

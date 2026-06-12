@@ -2,6 +2,15 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const { startServer, stopServer } = require('./server');
 
+// Prevent uncaught exceptions from displaying a dialog or crashing the application
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception in Main Process:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 let mainWindow;
 let serverPort = 9090;
 

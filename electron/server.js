@@ -59,7 +59,8 @@ const getFirebirdOptions = (db) => {
         database: row.caminho_banco,
         user: row.user,
         password: row.password,
-        lowercase_keys: true
+        lowercase_keys: true,
+        wireCrypt: false
       });
     });
   });
@@ -158,6 +159,66 @@ function handleAPI(req, res, url, method) {
         );
         return;
       }
+
+      if (url === '/api/firebird-test' && method === 'POST') {
+        const options = {
+          host: data.host || '127.0.0.1',
+          port: data.port,
+          database: data.database,
+          user: data.user || 'SYSDBA',
+          password: data.password || 'masterkey',
+          lowercase_keys: true,
+          wireCrypt: false
+        };
+
+        let responded = false;
+        const timeoutId = setTimeout(() => {
+          if (!responded) {
+            responded = true;
+            res.writeHead(400);
+            res.end(safeStringify({
+              status: 'error',
+              message: 'Tempo limite esgotado ao tentar conectar. Verifique se o IP/Porta estão corretos e se o banco Firebird está ativo.'
+            }));
+          }
+        }, 5000); // 5 seconds timeout
+
+        fbModule.testConnection(options)
+          .then(result => {
+            if (responded) return;
+            responded = true;
+            clearTimeout(timeoutId);
+            if (result.success) {
+              res.writeHead(200);
+              res.end(safeStringify({
+                status: 'success',
+                message: result.message,
+                details: {
+                  host: options.host,
+                  port: options.port
+                }
+              }));
+            } else {
+              res.writeHead(400);
+              res.end(safeStringify({
+                status: 'error',
+                message: result.message
+              }));
+            }
+          })
+          .catch(err => {
+            if (responded) return;
+            responded = true;
+            clearTimeout(timeoutId);
+            res.writeHead(500);
+            res.end(safeStringify({
+              status: 'error',
+              message: err.message || 'Erro interno ao testar conexão'
+            }));
+          });
+        return;
+      }
+
 
       if (url === '/api/tvs' && method === 'GET') {
         db.all('SELECT * FROM tvs ORDER BY created_at DESC', (err, rows) => {
@@ -403,45 +464,31 @@ function handleAPI(req, res, url, method) {
       if (photoMatch && method === 'GET') {
         const prodId = photoMatch[1];
         getFirebirdOptions(db).then(options => {
-           // We extract locally inside server.js fetching just one row
-           const firebird = require('node-firebird');
-           firebird.attach(options, (err, fb) => {
-             if (err) {
-               res.writeHead(500); return res.end(safeStringify({error: err.message}));
-             }
-             fb.query('SELECT PRD_FOTO FROM TB_PRODUTO WHERE PRD_ID = ?', [prodId], (err, result) => {
-               if (err || !result || result.length === 0) {
-                 fb.detach();
-                 res.writeHead(404); return res.end();
-               }
-               
-               const row = result[0];
-               if (row.PRD_FOTO && typeof row.PRD_FOTO === 'function') {
-                  row.PRD_FOTO(function(err, name, e) {
-                     if (err) { fb.detach(); res.writeHead(500); return res.end(); }
-                     res.writeHead(200, { 'Content-Type': 'image/jpeg' });
-                     let buffer = Buffer.alloc(0);
-                     e.on('data', chunk => buffer = Buffer.concat([buffer, chunk]));
-                     e.on('end', () => {
-                       fb.detach();
-                       // Optionally cache to disk here:
-                       try {
-                         const targetPath = path.join(__dirname, '../frontend/public/img/produtos');
-                         if (!fs.existsSync(targetPath)) fs.mkdirSync(targetPath, { recursive: true });
-                         fs.writeFileSync(path.join(targetPath, prodId + '.jpg'), buffer);
-                       } catch (writeErr) { /* ignore */ }
-                       res.end(buffer);
-                     });
-                  });
-               } else {
-                 fb.detach();
-                 // Might end up here if blob is empty
-                 res.writeHead(404); res.end();
-               }
-             });
-           });
+          fbModule.fetchPhoto(options, prodId)
+            .then(result => {
+              if (result && result.success) {
+                const targetFilePath = path.join(__dirname, '../frontend/public/img/produtos', prodId + '.jpg');
+                fs.readFile(targetFilePath, (err, fileData) => {
+                  if (err) {
+                    res.writeHead(404);
+                    res.end();
+                    return;
+                  }
+                  res.writeHead(200, { 'Content-Type': 'image/jpeg' });
+                  res.end(fileData);
+                });
+              } else {
+                res.writeHead(404);
+                res.end();
+              }
+            })
+            .catch(err => {
+              res.writeHead(500);
+              res.end(safeStringify({ error: err.message }));
+            });
         }).catch(err => {
-           res.writeHead(500); res.end();
+          res.writeHead(500);
+          res.end(safeStringify({ error: err.message }));
         });
         return;
       }
