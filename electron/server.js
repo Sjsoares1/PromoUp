@@ -437,7 +437,7 @@ function handleAPI(req, res, url, method) {
               const nome = p.PRD_DESCRICAO || p.prd_descricao || p.nome;
               const preco = p.PRD_PRECO_VENDA || p.prd_preco_venda || p.preco || 0;
               // Ajustado para refletir o caminho persistente
-              const foto = (p.PRD_FOTO || p.prd_foto || p.foto == 'TEM_FOTO') ? 'TEM_FOTO' : null;
+              const foto = (p.PRD_IMAGEM || p.prd_imagem || p.PRD_FOTO || p.prd_foto || p.foto == 'TEM_FOTO') ? 'TEM_FOTO' : null;
               
               stmt.run(String(id), nome, preco, foto);
             });

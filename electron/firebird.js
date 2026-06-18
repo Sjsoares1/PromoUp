@@ -44,7 +44,7 @@ const fbModule = {
       Firebird.attach(getOptions(options), function(err, db) {
         if (err) return reject(new Error(err.message));
         
-        db.query('SELECT PRD_ID, CAST(PRD_DESCRICAO AS VARCHAR(1000) CHARACTER SET OCTETS) AS PRD_DESCRICAO, PRD_PRECO_VENDA, PRD_FOTO FROM TB_PRODUTO', function(err, result) {
+        db.query('SELECT PRD_ID, CAST(PRD_DESCRICAO AS VARCHAR(1000) CHARACTER SET OCTETS) AS PRD_DESCRICAO, PRD_PRECO_VENDA, PRD_IMAGEM FROM TB_PRODUTO', function(err, result) {
           db.detach();
           if (err) return reject(new Error(err.message));
           
@@ -117,12 +117,14 @@ const fbModule = {
       Firebird.attach(getOptions(options), function(err, db) {
         if (err) return resolve({ success: false, error: err.message });
         
-        db.query('SELECT PRD_FOTO FROM TB_PRODUTO WHERE PRD_ID = ?', [prodId], function(err, result) {
-          db.detach();
-          if (err) return resolve({ success: false, error: err.message });
+        db.query('SELECT PRD_IMAGEM FROM TB_PRODUTO WHERE PRD_ID = ?', [prodId], function(err, result) {
+          if (err) {
+            db.detach();
+            return resolve({ success: false, error: err.message });
+          }
           
-          if (result && result.length > 0 && result[0].PRD_FOTO) {
-            const photoData = result[0].PRD_FOTO;
+          if (result && result.length > 0 && result[0].PRD_IMAGEM) {
+            const photoData = result[0].PRD_IMAGEM;
             
             const processBlob = (blobBuffer) => {
               try {
@@ -132,8 +134,10 @@ const fbModule = {
                 }
                 const photoFilename = `${prodId}.jpg`;
                 fs.writeFileSync(path.join(targetPath, photoFilename), blobBuffer);
+                db.detach();
                 resolve({ success: true, filename: photoFilename });
               } catch (e) {
+                db.detach();
                 resolve({ success: false, error: 'Erro ao salvar a foto: ' + e.message });
               }
             };
@@ -141,7 +145,10 @@ const fbModule = {
             if (typeof photoData === 'function') {
               // Lendo o BLOB de forma assíncrona
               photoData(function(err, name, e) {
-                if (err) return resolve({ success: false, error: err.message });
+                if (err) {
+                  db.detach();
+                  return resolve({ success: false, error: err.message });
+                }
                 let buffers = [];
                 e.on('data', function(chunk) {
                   buffers.push(chunk);
@@ -153,9 +160,11 @@ const fbModule = {
             } else if (Buffer.isBuffer(photoData)) {
               processBlob(photoData);
             } else {
+              db.detach();
               resolve({ success: false, error: "Formato de foto não suportado." });
             }
           } else {
+            db.detach();
             resolve({ success: false, error: "Foto não encontrada" });
           }
         });

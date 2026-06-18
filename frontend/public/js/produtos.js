@@ -53,14 +53,14 @@ async function carregarProdutos() {
       const id = produto.prd_id || produto.PRD_ID;
       const descricao = produto.prd_descricao || produto.PRD_DESCRICAO;
       const preco = produto.prd_preco_venda || produto.PRD_PRECO_VENDA || 0;
-      const foto = produto.prd_foto || produto.PRD_FOTO;
+      const foto = produto.PRD_IMAGEM || produto.prd_imagem || produto.prd_foto || produto.PRD_FOTO;
 
       const estaMarcado = idsSalvos.has(String(id)) ? 'checked' : '';
       const precoFormatado = Number(preco).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
       let htmlFoto = `<div style="width: 40px; height: 40px; background: #e2e8f0; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #64748B;">Sem Foto</div>`;
       if (foto === 'TEM_FOTO' || (typeof foto === 'string' && foto.includes('TEM_FOTO'))) {
-        htmlFoto = `<div style="width: 40px; height: 40px; background: #10b981; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #fff;">📸</div>`;
+        htmlFoto = `<img src="${API_URL}/produtos/${id}/foto" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px; background: #10b981;" alt="Foto" onerror="this.onerror=null; this.src='img/sample_product.png';">`;
       }
 
       const tr = document.createElement('tr');

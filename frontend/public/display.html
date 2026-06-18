@@ -334,7 +334,7 @@
                  id: p.PRD_ID || p.id,
                  nome: p.descricao,
                  preco: p.preco || 0,
-                 foto: p.foto || p.PRD_FOTO ? 'TEM_FOTO' : null,
+                 foto: p.foto || p.PRD_IMAGEM || p.PRD_FOTO ? 'TEM_FOTO' : null,
                  isPromo: true
                });
             }
@@ -385,7 +385,7 @@
             <div class="product-card">
               ${promoTag}
               <div class="image-container">
-                <img src="${imgPath}" alt="${nomeEscapado}" onerror="this.src=''; this.style.display='none';">
+                <img src="${imgPath}" alt="${nomeEscapado}" onerror="this.onerror=null; this.src='img/sample_product.png';">
               </div>
               <div class="product-details">
                 <div class="product-name">${nomeEscapado}</div>
