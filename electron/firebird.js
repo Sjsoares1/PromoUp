@@ -17,10 +17,24 @@ function getOptions(config) {
 }
 
 const fbModule = {
+  // Pool cache to prevent too many connections
+  pools: {},
+
+  getPool: function(options) {
+    const opts = getOptions(options);
+    // Cria uma chave única baseada no host e banco para evitar abrir vários pools
+    const key = `${opts.host}_${opts.port}_${opts.database}`;
+    if (!this.pools[key]) {
+      // Limite de 5 conexões simultâneas, o resto entra em fila aguardando liberação
+      this.pools[key] = Firebird.pool(5, opts);
+    }
+    return this.pools[key];
+  },
+
   // Testa se a conexão com o banco está viva
   testConnection: (options) => {
     return new Promise((resolve) => {
-      Firebird.attach(getOptions(options), function(err, db) {
+      fbModule.getPool(options).get(function(err, db) {
         if (err) {
           const errMsg = err.message || (typeof err === 'string' ? err : JSON.stringify(err));
           return resolve({ success: false, message: errMsg || 'Erro desconhecido ao conectar' });
@@ -41,7 +55,7 @@ const fbModule = {
   // Busca OFICIAL de Produtos na TB_PRODUTO
   getProdutos: (options) => {
     return new Promise((resolve, reject) => {
-      Firebird.attach(getOptions(options), function(err, db) {
+      fbModule.getPool(options).get(function(err, db) {
         if (err) return reject(new Error(err.message));
         
         db.query('SELECT PRD_ID, CAST(PRD_DESCRICAO AS VARCHAR(1000) CHARACTER SET OCTETS) AS PRD_DESCRICAO, PRD_PRECO_VENDA, PRD_IMAGEM FROM TB_PRODUTO', function(err, result) {
@@ -80,7 +94,7 @@ const fbModule = {
   // Busca OFICIAL de Promoções
   getPromocoes: (options) => {
     return new Promise((resolve, reject) => {
-      Firebird.attach(getOptions(options), function(err, db) {
+      fbModule.getPool(options).get(function(err, db) {
         if (err) return reject(new Error(err.message));
         
         db.query('SELECT * FROM TB_PROMOCAO', function(err, result) {
@@ -114,7 +128,7 @@ const fbModule = {
   // Extrai a foto de um produto e salva no disco
   fetchPhoto: (options, prodId) => {
     return new Promise((resolve, reject) => {
-      Firebird.attach(getOptions(options), function(err, db) {
+      fbModule.getPool(options).get(function(err, db) {
         if (err) return resolve({ success: false, error: err.message });
         
         db.query('SELECT PRD_IMAGEM FROM TB_PRODUTO WHERE PRD_ID = ?', [prodId], function(err, result) {

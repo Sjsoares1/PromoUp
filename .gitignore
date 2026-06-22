@@ -2,3 +2,5 @@ node_modules/
 .venv/
 promoup.db
 test_reports/
+frontend/public/img/produtos/*
+!frontend/public/img/produtos/.gitkeep
