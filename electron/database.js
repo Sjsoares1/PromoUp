@@ -1,13 +1,27 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
+const { app } = require('electron');
 
 let db;
 
 function initDatabase() {
   return new Promise((resolve, reject) => {
-    const dbPath = path.join(__dirname, '../promoup.db');
-    
+    const dbPath = path.join(app.getPath('userData'), 'promoup.db');
+    const oldDbPath = path.join(__dirname, '../promoup.db');
+    const migrationMarker = path.join(app.getPath('userData'), 'db_migrated.txt');
+
+    // Se o banco antigo existir e ainda não tivermos migrado, copia ele por cima do novo (que está vazio)
+    if (fs.existsSync(oldDbPath) && !fs.existsSync(migrationMarker)) {
+      try {
+        fs.copyFileSync(oldDbPath, dbPath);
+        fs.writeFileSync(migrationMarker, 'migrado com sucesso');
+        console.log('✓ Banco de dados antigo copiado para o userData com sucesso!');
+      } catch (err) {
+        console.error('Erro ao migrar banco antigo:', err);
+      }
+    }
+
     db = new sqlite3.Database(dbPath, (err) => {
       if (err) {
         reject(err);

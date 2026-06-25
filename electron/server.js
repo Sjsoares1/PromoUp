@@ -1,6 +1,8 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { app } = require('electron');
+const EventEmitter = require('events');
 const fbModule = require('./firebird'); 
 const { initDatabase, getDb } = require('./database');
 
@@ -8,6 +10,8 @@ let server;
 let serverShort;
 let shortPort = null;
 let sseClients = [];
+let dashboardClients = [];
+const statusEmitter = new EventEmitter();
 
 const MIME_TYPES = {
   '.html': 'text/html',
@@ -46,6 +50,54 @@ function safeStringify(obj) {
     typeof value === 'bigint' ? Number(value) : value
   );
 }
+
+function getDashboardStatus(db) {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT COUNT(*) as count FROM tvs WHERE ativa = 1', (err, rowTvs) => {
+      if (err) return reject(err);
+      db.get('SELECT COUNT(*) as count FROM produtos_selecionados', (err, rowPromos) => {
+        if (err) return reject(err);
+        db.get('SELECT COUNT(DISTINCT tv_id) as count FROM tv_configuracoes WHERE ativa = 1', (err, rowAtivas) => {
+          if (err) return reject(err);
+          const os = require('os');
+          const interfaces = os.networkInterfaces();
+          let localIp = 'localhost';
+          for (const interfaceName in interfaces) {
+            const addresses = interfaces[interfaceName];
+            for (const addr of addresses) {
+              if (addr.family === 'IPv4' && !addr.internal) {
+                localIp = addr.address;
+                break;
+              }
+            }
+            if (localIp !== 'localhost') break;
+          }
+          resolve({
+            tvs_ativas: rowTvs ? rowTvs.count : 0,
+            total_promocoes: rowPromos ? rowPromos.count : 0,
+            ativas_agora: rowAtivas ? rowAtivas.count : 0,
+            servidor_online: true,
+            local_ip: localIp,
+            short_port: shortPort
+          });
+        });
+      });
+    });
+  });
+}
+
+statusEmitter.on('update', async () => {
+  const db = getDb();
+  if (!db) return;
+  try {
+    const data = await getDashboardStatus(db);
+    dashboardClients.forEach(client => {
+      client.res.write(`data: ${JSON.stringify(data)}\n\n`);
+    });
+  } catch (error) {
+    console.error('Erro ao buscar status para SSE:', error);
+  }
+});
 
 const getFirebirdOptions = (db) => {
   return new Promise((resolve, reject) => {
@@ -89,6 +141,30 @@ function handleAPI(req, res, url, method) {
     return;
   }
 
+  // === Server-Sent Events (SSE) Dashboard Route ===
+  if (url === '/api/stream-status' && method === 'GET') {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*'
+    });
+    res.write('retry: 5000\n\n'); 
+
+    const clientId = Date.now();
+    const newClient = { id: clientId, res };
+    dashboardClients.push(newClient);
+
+    getDashboardStatus(db).then(data => {
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    }).catch(err => console.error(err));
+
+    req.on('close', () => {
+      dashboardClients = dashboardClients.filter(c => c.id !== clientId);
+    });
+    return;
+  }
+
   // Regular JSON APIs
   res.setHeader('Content-Type', 'application/json');
 
@@ -99,38 +175,12 @@ function handleAPI(req, res, url, method) {
       const data = body ? JSON.parse(body) : {};
 
       if (url === '/api/status' && method === 'GET') {
-        db.get('SELECT COUNT(*) as count FROM tvs WHERE ativa = 1', (err, rowTvs) => {
-          if (err) {
-            res.writeHead(500);
-            return res.end(safeStringify({ error: err.message }));
-          }
-          db.get('SELECT COUNT(*) as count FROM produtos_selecionados', (err, rowPromos) => {
-            db.get('SELECT COUNT(DISTINCT tv_id) as count FROM tv_configuracoes WHERE ativa = 1', (err, rowAtivas) => {
-              const os = require('os');
-              const interfaces = os.networkInterfaces();
-              let localIp = 'localhost';
-              for (const interfaceName in interfaces) {
-                const addresses = interfaces[interfaceName];
-                for (const addr of addresses) {
-                  if (addr.family === 'IPv4' && !addr.internal) {
-                    localIp = addr.address;
-                    break;
-                  }
-                }
-                if (localIp !== 'localhost') break;
-              }
-
-              res.writeHead(200);
-              res.end(safeStringify({
-                tvs_ativas: rowTvs ? rowTvs.count : 0,
-                total_promocoes: rowPromos ? rowPromos.count : 0,
-                ativas_agora: rowAtivas ? rowAtivas.count : 0,
-                servidor_online: true,
-                local_ip: localIp,
-                short_port: shortPort
-              }));
-            });
-          });
+        getDashboardStatus(db).then(data => {
+          res.writeHead(200);
+          res.end(safeStringify(data));
+        }).catch(err => {
+          res.writeHead(500);
+          res.end(safeStringify({ error: err.message }));
         });
         return;
       }
@@ -251,6 +301,7 @@ function handleAPI(req, res, url, method) {
             res.writeHead(201);
             res.end(safeStringify({ id, ...data }));
             notifyTvs('tv-update', { action: 'tv-created', id }); // Notificação SSE
+            statusEmitter.emit('update');
           }
         );
         return;
@@ -299,6 +350,7 @@ function handleAPI(req, res, url, method) {
             res.writeHead(200);
             res.end(safeStringify({ message: 'TV atualizada' }));
             notifyTvs('tv-update', { action: 'tv-updated', id: tvId }); // Notificação SSE
+            statusEmitter.emit('update');
           }
         );
         return;
@@ -319,6 +371,7 @@ function handleAPI(req, res, url, method) {
             res.writeHead(201);
             res.end(safeStringify({ id: this.lastID, ...data }));
             notifyTvs('tv-update', { action: 'config-updated', tv_id: tvId });
+            statusEmitter.emit('update');
           }
         );
         return;
@@ -382,14 +435,20 @@ function handleAPI(req, res, url, method) {
       // ===== PRODUTOS (LEMBRANDO QUE NÃO HÁ MAIS JSON)
       // ==================================================
       if (url === '/api/produtos' && method === 'GET') {
+         const searchParams = new URLSearchParams(req.url.split('?')[1] || '');
+         const params = {
+           page: searchParams.get('page') || 1,
+           limit: searchParams.get('limit') || 50,
+           search: searchParams.get('search') || ''
+         };
+         
          getFirebirdOptions(db).then(async options => {
           try {
-            // Removemos o cache temporario local em JSON a pedido do cliente.
-            // Agora a busca reflete em tempo real tudo que esta no Firebird para a seleção
-            const produtos = await fbModule.getProdutos(options);
+            // Agora a busca reflete em tempo real tudo que esta no Firebird para a seleção com Paginação
+            const result = await fbModule.getProdutos(options, params);
             
             // Remove function fields (like blobs) to safely serialize JSON to the client picker
-            const safeProdutos = produtos.map(p => {
+            result.data = result.data.map(p => {
                const copy = { ...p };
                Object.keys(copy).forEach(k => {
                   if (typeof copy[k] === 'function') {
@@ -400,7 +459,7 @@ function handleAPI(req, res, url, method) {
             });
 
             res.writeHead(200);
-            res.end(safeStringify(safeProdutos));
+            res.end(safeStringify(result));
           } catch (err) {
             res.writeHead(500);
             res.end(safeStringify({ error: 'Erro ao buscar produtos direto do Firebird', details: err.message }));
@@ -454,6 +513,7 @@ function handleAPI(req, res, url, method) {
             
             // FIRE EVENT TO TVs INSTANTLY
             notifyTvs('tv-update', { action: 'produtos-atualizados' });
+            statusEmitter.emit('update');
           });
         });
         return;
@@ -467,7 +527,7 @@ function handleAPI(req, res, url, method) {
           fbModule.fetchPhoto(options, prodId)
             .then(result => {
               if (result && result.success) {
-                const targetFilePath = path.join(__dirname, '../frontend/public/img/produtos', prodId + '.jpg');
+                const targetFilePath = path.join(app.getPath('userData'), 'img', 'produtos', prodId + '.jpg');
                 fs.readFile(targetFilePath, (err, fileData) => {
                   if (err) {
                     res.writeHead(404);
@@ -519,6 +579,13 @@ function requestHandler(req, res) {
 
   if (url.startsWith('/api/')) {
     handleAPI(req, res, url, method);
+    return;
+  }
+
+  if (url.startsWith('/imagens-dinamicas/')) {
+    const fileName = decodeURIComponent(url.substring('/imagens-dinamicas/'.length));
+    const imagePath = path.join(app.getPath('userData'), 'img', 'produtos', fileName);
+    serveStatic(res, imagePath);
     return;
   }
 
@@ -602,6 +669,7 @@ function stopServer() {
     } catch (e) {}
   }
   sseClients.forEach(c => c.res.end());
+  dashboardClients.forEach(c => c.res.end());
 }
 
 module.exports = { startServer, stopServer };

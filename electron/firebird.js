@@ -1,6 +1,7 @@
 const Firebird = require('node-firebird');
 const fs = require('fs');
 const path = require('path');
+const { app } = require('electron');
 
 // Função auxiliar para mapear as configurações
 function getOptions(config) {
@@ -53,39 +54,74 @@ const fbModule = {
   },
 
   // Busca OFICIAL de Produtos na TB_PRODUTO
-  getProdutos: (options) => {
+  getProdutos: (options, params = {}) => {
     return new Promise((resolve, reject) => {
       fbModule.getPool(options).get(function(err, db) {
         if (err) return reject(new Error(err.message));
         
-        db.query('SELECT PRD_ID, CAST(PRD_DESCRICAO AS VARCHAR(1000) CHARACTER SET OCTETS) AS PRD_DESCRICAO, PRD_PRECO_VENDA, PRD_IMAGEM FROM TB_PRODUTO', function(err, result) {
-          db.detach();
-          if (err) return reject(new Error(err.message));
-          
-          try {
-            const produtos = result.map(row => {
-              const newRow = {};
-              Object.keys(row).forEach(key => {
-                let val = row[key];
-                
-                if (typeof val === 'function') {
-                  newRow[key] = 'TEM_FOTO';
-                } else if (key === 'PRD_DESCRICAO' && Buffer.isBuffer(val)) {
-                  // Decodifica usando latin1 para preservar caracteres especiais como Ã, Ó, etc (WIN1252/ISO8859_1)
-                  newRow[key] = val.toString('latin1');
-                } else if (Buffer.isBuffer(val)) {
-                  // Transforma buffer em string se possível
-                  newRow[key] = val.toString('utf8');
-                } else {
-                  newRow[key] = val;
-                }
-              });
-              return newRow;
-            });
-            resolve(produtos);
-          } catch (e) {
-            reject(new Error('Falha ao processar dados dos produtos: ' + e.message));
+        const page = parseInt(params.page) || 1;
+        const limit = parseInt(params.limit) || 50;
+        const search = params.search || '';
+        
+        let whereClause = '';
+        let queryParams = [];
+        
+        if (search) {
+          const searchUpper = search.toUpperCase();
+          whereClause = ' WHERE UPPER(CAST(PRD_DESCRICAO AS VARCHAR(1000) CHARACTER SET WIN1252)) LIKE ? OR CAST(PRD_ID AS VARCHAR(50)) LIKE ?';
+          queryParams.push(`%${searchUpper}%`, `%${searchUpper}%`);
+        }
+        
+        const skip = (page - 1) * limit;
+        
+        const countSql = `SELECT COUNT(*) AS TOTAL FROM TB_PRODUTO${whereClause}`;
+        db.query(countSql, queryParams, function(err, countResult) {
+          if (err) {
+            db.detach();
+            return reject(new Error('Erro ao contar produtos: ' + err.message));
           }
+          
+          let total = 0;
+          if (countResult && countResult.length > 0) {
+            total = parseInt(countResult[0].TOTAL || countResult[0].total || 0);
+          }
+          
+          const sql = `SELECT FIRST ${limit} SKIP ${skip} PRD_ID, CAST(PRD_DESCRICAO AS VARCHAR(1000) CHARACTER SET OCTETS) AS PRD_DESCRICAO, PRD_PRECO_VENDA, PRD_IMAGEM FROM TB_PRODUTO${whereClause}`;
+          
+          db.query(sql, queryParams, function(err, result) {
+            db.detach();
+            if (err) return reject(new Error(err.message));
+            
+            try {
+              const produtos = result.map(row => {
+                const newRow = {};
+                Object.keys(row).forEach(key => {
+                  let val = row[key];
+                  
+                  if (typeof val === 'function') {
+                    newRow[key] = 'TEM_FOTO';
+                  } else if (key === 'PRD_DESCRICAO' && Buffer.isBuffer(val)) {
+                    // Decodifica usando latin1 para preservar caracteres especiais como Ã, Ó, etc (WIN1252/ISO8859_1)
+                    newRow[key] = val.toString('latin1');
+                  } else if (Buffer.isBuffer(val)) {
+                    // Transforma buffer em string se possível
+                    newRow[key] = val.toString('utf8');
+                  } else {
+                    newRow[key] = val;
+                  }
+                });
+                return newRow;
+              });
+              resolve({
+                data: produtos,
+                total: total,
+                page: page,
+                limit: limit
+              });
+            } catch (e) {
+              reject(new Error('Falha ao processar dados dos produtos: ' + e.message));
+            }
+          });
         });
       });
     });
@@ -142,7 +178,7 @@ const fbModule = {
             
             const processBlob = (blobBuffer) => {
               try {
-                const targetPath = path.join(__dirname, '../frontend/public/img/produtos');
+                const targetPath = path.join(app.getPath('userData'), 'img', 'produtos');
                 if (!fs.existsSync(targetPath)) {
                   fs.mkdirSync(targetPath, { recursive: true });
                 }

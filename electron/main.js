@@ -1,14 +1,45 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { startServer, stopServer } = require('./server');
 
-// Prevent uncaught exceptions from displaying a dialog or crashing the application
+// Função auxiliar para lidar com falhas críticas (Fail-Fast & Recover)
+function handleFatalError(error, type) {
+    // 3.1 - Converte o erro em uma string formatada (data, hora e stack trace)
+    const now = new Date();
+    const timestamp = now.toLocaleString('pt-BR');
+    const errorMessage = error instanceof Error ? error.stack || error.message : String(error);
+    const logEntry = `\n[${timestamp}] [${type}]\n${errorMessage}\n----------------------------------------\n`;
+
+    try {
+        // 3.2 - Salva o log no arquivo crash_logs.txt dentro do diretório userData
+        const logFilePath = path.join(app.getPath('userData'), 'crash_logs.txt');
+        fs.appendFileSync(logFilePath, logEntry);
+    } catch (fsError) {
+        console.error('Falha ao escrever no log de crash:', fsError);
+    }
+
+    // 3.3 - Mostra mensagem amigável para o usuário final
+    dialog.showErrorBox(
+        'Erro Crítico no Sistema',
+        'Ocorreu um erro grave e o aplicativo precisa ser reiniciado para evitar corrupção de dados.\n\n' +
+        'O erro já foi registrado nos nossos logs de diagnóstico.\n\n' +
+        'O sistema será reiniciado automaticamente após você fechar este aviso.'
+    );
+
+    // 3.4 - Reinicia o app imediatamente após o fechamento da janela de diálogo (Fail-Fast & Recover)
+    app.relaunch();
+    app.exit(1);
+}
+
+// Intercepta exceções não tratadas (Síncronas)
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception in Main Process:', error);
+    handleFatalError(error, 'UNCAUGHT_EXCEPTION');
 });
 
+// Intercepta promessas rejeitadas e não tratadas (Assíncronas)
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    handleFatalError(reason, 'UNHANDLED_REJECTION');
 });
 
 let mainWindow;

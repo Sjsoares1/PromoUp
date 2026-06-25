@@ -230,10 +230,7 @@
 </head>
 <body>
 
-  <div class="header">
-    <div class="tv-title" id="tv-name">Menu Digital</div>
-    <div style="font-size: 32px; font-weight: bold; color: #fff; font-family: 'Montserrat'; opacity: 0.8" id="clock">00:00</div>
-  </div>
+  <!-- Header com nome da TV e relógio removido conforme solicitação -->
 
   <div class="main-container">
     <div class="loader-container" id="loader">
@@ -267,7 +264,8 @@
     // Clock update
     setInterval(() => {
       const now = new Date();
-      document.getElementById('clock').innerText = now.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+      const clockEl = document.getElementById('clock');
+      if (clockEl) clockEl.innerText = now.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
     }, 1000);
 
     function formatPrice(value) {
@@ -304,7 +302,8 @@
           }
         }
         
-        document.getElementById('tv-name').innerText = tvName;
+        const tvNameEl = document.getElementById('tv-name');
+        if (tvNameEl) tvNameEl.innerText = tvName;
 
         const [prodResponse, promoResponse] = await Promise.all([
           fetch(`${API_URL}/produtos-selecionados`).catch(() => null),

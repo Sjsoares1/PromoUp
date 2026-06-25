@@ -1,17 +1,31 @@
 const API_URL = window.APP_CONFIG?.API_URL || 'http://localhost:9090/api';
 
-let todosProdutos = [];
-let idsSalvos = new Set();
+let produtosNaPagina = [];
+let produtosSelecionadosMap = new Map(); // id -> objeto produto
+let primeiraCarga = true;
+
+// Utilitário de Debounce
+function debounce(func, wait) {
+  let timeout;
+  return function(...args) {
+    const context = this;
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(context, args), wait);
+  };
+}
+
 
 // Estado da tabela
-let sortCol = '';
-let sortAsc = true;
 let currentPage = 1;
-let itemsPerPage = 10;
+let itemsPerPage = 50;
 let searchQuery = '';
+let totalItems = 0;
+let totalPages = 1;
 
 // 1. FUNÇÃO PARA BUSCAR DADOS
-async function carregarProdutos() {
+async function carregarProdutos(resetPage = false) {
+  if (resetPage) currentPage = 1;
+
   const btnSync = document.getElementById('btn-sync');
   const tbody = document.getElementById('tabela-produtos');
 
@@ -23,34 +37,42 @@ async function carregarProdutos() {
   tbody.innerHTML = `<tr><td colspan="5" style="padding: 20px; text-align: center;">Carregando produtos...</td></tr>`;
 
   try {
-    const resLocais = await fetch(`${API_URL}/produtos-selecionados`);
-    const produtosSalvos = await resLocais.json();
-    idsSalvos = new Set(produtosSalvos.map(p => String(p.id)));
-
-    const resJson = await fetch(`${API_URL}/produtos`);
-    if (!resJson.ok) throw new Error("Erro ao consultar ERP");
-    const produtosJson = await resJson.json();
-
-    const mapaProdutos = new Map();
-
-    produtosSalvos.forEach(p => {
-      mapaProdutos.set(String(p.id), {
-        prd_id: p.id,
-        prd_descricao: p.nome,
-        prd_preco_venda: p.preco,
-        prd_foto: p.foto
+    if (primeiraCarga) {
+      const resLocais = await fetch(`${API_URL}/produtos-selecionados`);
+      const produtosSalvos = await resLocais.json();
+      
+      produtosSalvos.forEach(p => {
+        produtosSelecionadosMap.set(String(p.id), {
+          prd_id: p.id,
+          prd_descricao: p.nome,
+          prd_preco_venda: p.preco,
+          prd_foto: p.foto
+        });
       });
-    });
-
-    if (Array.isArray(produtosJson)) {
-      produtosJson.forEach(p => {
-        const id = p.prd_id || p.PRD_ID;
-        mapaProdutos.set(String(id), p);
-      });
+      primeiraCarga = false;
     }
 
-    todosProdutos = Array.from(mapaProdutos.values());
-    currentPage = 1; // Reseta a página ao recarregar
+    const limitQuery = itemsPerPage === 'all' ? 10000 : itemsPerPage;
+    const url = `${API_URL}/produtos?page=${currentPage}&limit=${limitQuery}&search=${encodeURIComponent(searchQuery)}`;
+
+    const resJson = await fetch(url);
+    if (!resJson.ok) throw new Error("Erro ao consultar ERP");
+    
+    const result = await resJson.json();
+
+    produtosNaPagina = result.data || [];
+    totalItems = result.total || 0;
+    
+    // Calcula total de páginas
+    if (limitQuery >= totalItems) {
+      totalPages = 1;
+    } else {
+      totalPages = Math.ceil(totalItems / limitQuery);
+    }
+    
+    if (totalPages === 0) totalPages = 1;
+    if (currentPage > totalPages) currentPage = totalPages;
+
     renderTabela();
 
   } catch (error) {
@@ -68,69 +90,16 @@ function renderTabela() {
   const tbody = document.getElementById('tabela-produtos');
   tbody.innerHTML = '';
 
-  if (todosProdutos.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" style="padding: 20px; text-align: center; color: #64748B;">Nenhum produto listado no ERP.</td></tr>`;
-    atualizarPaginacao(0, 0);
-    return;
-  }
-
-  // 1. Filtrar
-  let produtosFiltrados = todosProdutos.filter(p => {
-    const id = String(p.prd_id || p.PRD_ID || '');
-    const descricao = String(p.prd_descricao || p.PRD_DESCRICAO || '').toLowerCase();
-    const preco = String(p.prd_preco_venda || p.PRD_PRECO_VENDA || 0);
-    return id.includes(searchQuery) || descricao.includes(searchQuery) || preco.includes(searchQuery);
-  });
-
-  // 2. Ordenar
-  if (sortCol) {
-    produtosFiltrados.sort((a, b) => {
-      let valA, valB;
-      if (sortCol === 'id') {
-        valA = Number(a.prd_id || a.PRD_ID) || 0;
-        valB = Number(b.prd_id || b.PRD_ID) || 0;
-      } else if (sortCol === 'descricao') {
-        valA = String(a.prd_descricao || a.PRD_DESCRICAO || '').toLowerCase();
-        valB = String(b.prd_descricao || b.PRD_DESCRICAO || '').toLowerCase();
-      } else if (sortCol === 'preco') {
-        valA = Number(a.prd_preco_venda || a.PRD_PRECO_VENDA || 0);
-        valB = Number(b.prd_preco_venda || b.PRD_PRECO_VENDA || 0);
-      }
-      
-      if (valA < valB) return sortAsc ? -1 : 1;
-      if (valA > valB) return sortAsc ? 1 : -1;
-      return 0;
-    });
-  }
-
-  // 3. Paginar
-  const totalItems = produtosFiltrados.length;
-  let totalPages = 1;
-  let produtosPaginados = produtosFiltrados;
-
-  if (itemsPerPage !== 'all') {
-    const limit = parseInt(itemsPerPage, 10);
-    totalPages = Math.ceil(totalItems / limit);
-    if (totalPages === 0) totalPages = 1;
-    if (currentPage > totalPages) currentPage = totalPages;
-
-    const start = (currentPage - 1) * limit;
-    const end = start + limit;
-    produtosPaginados = produtosFiltrados.slice(start, end);
-  } else {
-    currentPage = 1;
-  }
-
-  if (produtosPaginados.length === 0) {
+  if (produtosNaPagina.length === 0) {
     tbody.innerHTML = `<tr><td colspan="5" style="padding: 20px; text-align: center; color: #64748B;">Nenhum produto encontrado.</td></tr>`;
   } else {
-    produtosPaginados.forEach(produto => {
+    produtosNaPagina.forEach(produto => {
       const id = produto.prd_id || produto.PRD_ID;
       const descricao = produto.prd_descricao || produto.PRD_DESCRICAO;
       const preco = produto.prd_preco_venda || produto.PRD_PRECO_VENDA || 0;
       const foto = produto.PRD_IMAGEM || produto.prd_imagem || produto.prd_foto || produto.PRD_FOTO;
 
-      const estaMarcado = idsSalvos.has(String(id)) ? 'checked' : '';
+      const estaMarcado = produtosSelecionadosMap.has(String(id)) ? 'checked' : '';
       const precoFormatado = Number(preco).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
       let htmlFoto = `<div style="width: 40px; height: 40px; background: #e2e8f0; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #64748B;">Sem Foto</div>`;
@@ -164,11 +133,10 @@ function renderTabela() {
     });
   }
 
-  atualizarPaginacao(totalItems, totalPages);
-  atualizarSetasOrdenacao();
+  atualizarPaginacao();
 }
 
-function atualizarPaginacao(totalItems, totalPages) {
+function atualizarPaginacao() {
   const info = document.getElementById('info-paginacao');
   const btnPrev = document.getElementById('btn-prev');
   const btnNext = document.getElementById('btn-next');
@@ -194,58 +162,31 @@ function atualizarPaginacao(totalItems, totalPages) {
 
 function mudarPagina(delta) {
   currentPage += delta;
-  renderTabela();
+  carregarProdutos();
 }
 
 function mudarItensPorPagina() {
   itemsPerPage = document.getElementById('itensPorPagina').value;
-  currentPage = 1;
-  renderTabela();
-}
-
-function ordenarPor(coluna) {
-  if (sortCol === coluna) {
-    sortAsc = !sortAsc;
-  } else {
-    sortCol = coluna;
-    sortAsc = true;
-  }
-  renderTabela();
-}
-
-function atualizarSetasOrdenacao() {
-  const colunas = ['id', 'descricao', 'preco'];
-  colunas.forEach(col => {
-    const span = document.getElementById(`sort-${col}`);
-    if (span) {
-      if (sortCol === col) {
-        span.textContent = sortAsc ? ' ↑' : ' ↓';
-        span.style.color = '#334155';
-        span.style.fontWeight = 'bold';
-      } else {
-        span.textContent = ' ↕';
-        span.style.color = '#94a3b8';
-        span.style.fontWeight = 'normal';
-      }
-    }
-  });
+  carregarProdutos(true);
 }
 
 function sincronizarERP() {
-  carregarProdutos();
+  carregarProdutos(true);
 }
 
 function filtrarTabela() {
   searchQuery = document.getElementById('buscaProduto').value.toLowerCase();
-  currentPage = 1; // Reseta para a primeira página ao buscar
-  renderTabela();
+  carregarProdutos(true); // Sempre recarrega na primeira pagina
 }
 
 function toggleProduto(idStr, isChecked) {
   if (isChecked) {
-    idsSalvos.add(idStr);
+    const produto = produtosNaPagina.find(p => String(p.prd_id || p.PRD_ID) === idStr);
+    if (produto) {
+      produtosSelecionadosMap.set(idStr, produto);
+    }
   } else {
-    idsSalvos.delete(idStr);
+    produtosSelecionadosMap.delete(idStr);
   }
 }
 
@@ -258,6 +199,40 @@ function marcarTodos(checkboxGeral) {
   }
 }
 
+// Sistema de Toast Notification
+function mostrarToast(mensagem, tipo = 'sucesso') {
+  let container = document.querySelector('.toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.className = 'toast-container';
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${tipo}`;
+  
+  let iconSvg = '';
+  if (tipo === 'sucesso') {
+    iconSvg = `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
+  } else {
+    iconSvg = `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>`;
+  }
+
+  toast.innerHTML = `
+    <div class="toast-icon">${iconSvg}</div>
+    <div class="toast-message">${mensagem}</div>
+  `;
+
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.classList.add('fade-out');
+    toast.addEventListener('animationend', () => {
+      toast.remove();
+    });
+  }, 3500);
+}
+
 // 3. FUNÇÃO DO BOTÃO "SALVAR PRODUTOS SELECIONADOS"
 async function salvarSelecao() {
   const btnSalvar = document.getElementById('btn-salvar');
@@ -265,12 +240,7 @@ async function salvarSelecao() {
   btnSalvar.innerHTML = 'Salvando no Banco...';
   btnSalvar.disabled = true;
 
-  const selecionados = [];
-  
-  idsSalvos.forEach(idStr => {
-    const produtoCompleto = todosProdutos.find(p => String(p.prd_id || p.PRD_ID) === idStr);
-    if (produtoCompleto) selecionados.push(produtoCompleto);
-  });
+  const selecionados = Array.from(produtosSelecionadosMap.values());
 
   try {
     const response = await fetch(`${API_URL}/produtos-selecionados`, {
@@ -280,41 +250,35 @@ async function salvarSelecao() {
     });
 
     if (response.ok) {
-      // Disparos WebSocket (SSE) ocorrem silenciosamente no backend que vao atualizar a TV na mesma hora.
-      btnSalvar.innerHTML = '✔ Salvo com sucesso!';
-      btnSalvar.style.backgroundColor = '#10B981';
-      setTimeout(() => {
-        btnSalvar.innerHTML = textoOriginal;
-        btnSalvar.style.backgroundColor = '';
-        btnSalvar.disabled = false;
-      }, 3000);
-      return; // Retorna cedo para não reabilitar o botão no finally imediatamente
+      mostrarToast('Configurações salvas com sucesso!', 'sucesso');
     } else {
-      btnSalvar.innerHTML = '❌ Erro ao salvar';
-      btnSalvar.style.backgroundColor = '#EF4444';
-      setTimeout(() => {
-        btnSalvar.innerHTML = textoOriginal;
-        btnSalvar.style.backgroundColor = '';
-        btnSalvar.disabled = false;
-      }, 3000);
-      return;
+      mostrarToast('Erro ao salvar configurações.', 'erro');
     }
   } catch (error) {
     console.error(error);
-    btnSalvar.innerHTML = '❌ Falha na conexão';
-    btnSalvar.style.backgroundColor = '#EF4444';
-    setTimeout(() => {
-      btnSalvar.innerHTML = textoOriginal;
-      btnSalvar.style.backgroundColor = '';
-      btnSalvar.disabled = false;
-    }, 3000);
-    return;
+    mostrarToast('Falha na conexão com o servidor.', 'erro');
+  } finally {
+    btnSalvar.innerHTML = textoOriginal;
+    btnSalvar.disabled = false;
   }
 }
 
 // Inicializa a tabela
 window.addEventListener('DOMContentLoaded', () => {
   const inputBusca = document.getElementById('buscaProduto');
-  if (inputBusca) inputBusca.value = ''; // Limpa o cache do navegador para não bugar a busca
+  if (inputBusca) {
+    inputBusca.value = ''; // Limpa o cache do navegador para não bugar a busca
+    
+    // Adiciona o evento de input com debounce de 300ms
+    inputBusca.addEventListener('input', debounce(filtrarTabela, 300));
+  }
+  
+  // Set default pagination to 50
+  const selectItens = document.getElementById('itensPorPagina');
+  if (selectItens) {
+    selectItens.value = '50';
+    itemsPerPage = 50;
+  }
+  
   carregarProdutos();
 });
